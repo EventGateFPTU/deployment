@@ -1,0 +1,14 @@
+version: '3'
+
+tasks:
+  up-*:
+    vars:
+      ENVIRONMENT: '{{index .MATCH 0}}'
+    dir: ./wowtogo
+    cmd: docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d
+
+  down-*:
+    vars:
+      ENVIRONMENT: '{{index .MATCH 0}}'
+    dir: ./wowtogo
+    cmd: docker compose -f docker-compose-{{.ENVIRONMENT}}.yaml down
