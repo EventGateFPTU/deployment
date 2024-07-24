@@ -1,4 +1,4 @@
-version: '3.9'
+version: '3'
 services:
 
   reverse-proxy:
@@ -26,7 +26,7 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
     labels:
       - "traefik.http.routers.reverse-proxy-rtr.rule=Host(`${DOMAIN_TRAEFIK}`)"
-      - "traefik.http.routers.reverse-proxy-rtr.entrypoints=http"
+      - "traefik.http.routers.reverse-proxy-rtr.entrypoints=https"
       - "traefik.http.routers.reverse-proxy-rtr.tls=true"
       - "traefik.http.routers.reverse-proxy-rtr.tls.certresolver=letsencrypt"
       - "traefik.http.routers.reverse-proxy-rtr.service=api@internal"
@@ -55,38 +55,118 @@ services:
       - "traefik.http.routers.frontend.service=frontend"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
       - "traefik.http.routers.frontend.rule=Host(`${DOMAIN_FRONTEND}`)"
-      - "traefik.http.routers.frontend.entrypoints=http"
+      - "traefik.http.routers.frontend.entrypoints=https"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
 
-  # backend:
-  #   image: profileorg/wowtogo-be-dev:latest
-  #   container_name: backend
-  #   restart: unless-stopped
-  #   ports:
-  #     - 8080
-  #   volumes:
-  #     - ./app:/app
-  #   environment:
-  #     - ENV_VARIABLE=value
-  #   depends_on:
-  #     - db
+  backend:
+    image: profileorg/wowtogo-be-dev:latest
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - 80
+    environment:
+      - ASPNETCORE_URLS=http://+
+      - CLIENT_ORIGIN_URL=https://${DOMAIN_FRONTEND}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - POSTGRES_CONSTR=User ID=${BE_PG_USERNAME};Password=${BE_PG_PASSWORD};Host=backend_database;Port=5432;Database=${BE_PG_DATABASE};Pooling=true;Connection Lifetime=0;
+      - CLOUDINARY_URL=${CLOUDINARY_URL}
+      - FGA_API_URL=http://openfga:8080
+      - HOST=https://send.api.mailtrap.io/api/send
+      - PORT=25
+      - USERNAME=${MAIL_USERNAME}
+      - PASSWORD=${MAIL_PASSWORD}
+      - TOKEN=${MAIL_TOKEN}
+      - SENDER_NAME=${MAIL_SENDER_NAME}
+      - SENDER_EMAIL=${MAIL_SENDER_EMAIL}
+      - TEMPLATE_ID=${MAIL_TEMPLATE_ID}
+    depends_on:
+      - backend_database
+    networks:
+      - traefik
+    labels:
+      - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.services.backend.loadbalancer.server.port=80"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN_BACKEND}`)"
+      - "traefik.http.routers.backend.entrypoints=https"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
 
-  # backend-database:
-  #   image: postgres:latest
-  #   container_name: postgresbe
-  #   restart: unless-stopped
-  #   ports:
-  #     - 5432
-  #   environment:
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=postgres
-  #     - POSTGRES_DB=postgres
-  #   volumes:
-  #     - backend_db:/var/lib/postgresql/data
-  #   networks:
-  #     - local
+  backend_database:
+    image: postgres:14-alpine
+    container_name: backend_postgres
+    restart: unless-stopped
+    ports:
+      - 5432
+    environment:
+      - POSTGRES_USER=${BE_PG_USERNAME}
+      - POSTGRES_PASSWORD=${BE_PG_PASSWORD}
+      - POSTGRES_DB=${BE_PG_DATABASE}
+    volumes:
+      - backend_db:/var/lib/postgresql/data
+    networks:
+      - traefik
 
+  open_fga_postgres:
+    image: postgres:14-alpine
+    container_name: fga_postgres
+    networks:
+      - traefik
+    environment:
+      - POSTGRES_USER=${FGA_PG_USERNAME}
+      - POSTGRES_PASSWORD=${FGA_PG_PASSWORD}
+    volumes:
+      - openfga_db:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${FGA_PG_USERNAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  open_fga_migrate:
+    depends_on:
+      open_fga_postgres:
+        condition: service_healthy
+    image: openfga/openfga:latest
+    command: migrate
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://${FGA_PG_USERNAME}:${FGA_PG_PASSWORD}@fga_postgres:5432/postgres?sslmode=disable
+    networks:
+      - traefik
+
+  open_fga:
+    container_name: openfga
+    depends_on:
+      open_fga_migrate:
+        condition: service_completed_successfully
+    image: openfga/openfga:latest
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://${FGA_PG_USERNAME}:${FGA_PG_PASSWORD}@fga_postgres:5432/postgres?sslmode=disable
+      - OPENFGA_LOG_FORMAT=json
+    command: run
+    networks:
+      - traefik
+    ports:
+      # Needed for the http server
+      - 8080
+      # Needed for the grpc server (if used)
+      - 8081
+      # Needed for the playground (Do not enable in prod!)
+      - 3000
+    labels:
+      - "traefik.http.routers.openfga.service=openfga"
+      - "traefik.http.services.openfga.loadbalancer.server.port=3000"
+      - "traefik.http.routers.openfga.rule=Host(`${DOMAIN_OPENFGA}`)"
+      - "traefik.http.routers.openfga.entrypoints=https"
+      - "traefik.http.routers.openfga.tls=true"
+      - "traefik.http.routers.openfga.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openfga.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_AUTH}"
+      - "traefik.http.middlewares.traefik-auth.basicauth.removeheader=true"
+      
 volumes:
   backend_db:
   openfga_db:
@@ -94,6 +174,4 @@ volumes:
 
 networks:
   traefik: {}
-  local:
-    internal: true
   

@@ -5,10 +5,23 @@ tasks:
     vars:
       ENVIRONMENT: '{{index .MATCH 0}}'
     dir: ./wowtogo
-    cmd: docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d
+    cmds:
+      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml pull
+      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d frontend backend backend_database open_fga_postgres open_fga_migrate open_fga
+      - sleep 10
+      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d reverse-proxy
 
   down-*:
     vars:
       ENVIRONMENT: '{{index .MATCH 0}}'
     dir: ./wowtogo
     cmd: docker compose -f docker-compose-{{.ENVIRONMENT}}.yaml down
+
+  clear:
+    dir: ./wowtogo
+    cmds:
+      - docker volume rm wowtogo_backend_db wowtogo_openfga_db wowtogo_traefik-logs
+      - docker system prune -f
+      - docker volume prune -f
+      - rm -rf ./letsencrypt
+    interactive: true
