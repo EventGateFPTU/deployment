@@ -32,6 +32,6 @@ tasks:
       ENVIRONMENT: '{{index .MATCH 0}}'
     dir: ./wowtogo
     cmds:
-      - docker compose -f docker-compose-{{.ENVIRONMENT}}.yaml down frontend backend
       - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml pull frontend backend
+      - docker compose -f docker-compose-{{.ENVIRONMENT}}.yaml down frontend backend
       - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d frontend backend
