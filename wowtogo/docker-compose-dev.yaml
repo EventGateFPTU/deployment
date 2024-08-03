@@ -70,7 +70,7 @@ services:
       - CLIENT_ORIGIN_URL=https://${DOMAIN_FRONTEND}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
       - AUTH0_DOMAIN=${AUTH0_DOMAIN}
-      - POSTGRES_CONSTR=User ID=${BE_PG_USERNAME};Password=${BE_PG_PASSWORD};Host=backend_database;Port=5432;Database=${BE_PG_DATABASE};Pooling=true;Connection Lifetime=0;
+      - POSTGRES_CONSTR=User ID=${BE_PG_USERNAME};Password=${BE_PG_PASSWORD};Host=backend_postgres;Port=5432;Database=${BE_PG_DATABASE};Pooling=true;Connection Lifetime=0;
       - CLOUDINARY_URL=${CLOUDINARY_URL}
       - FGA_API_URL=http://openfga:8080
       - HOST=https://send.api.mailtrap.io/api/send
