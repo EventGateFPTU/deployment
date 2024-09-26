@@ -1,0 +1,71 @@
+version: '3'
+
+services:
+  frontend:
+    image: profileorg/wowtogo-fe-dev:latest
+    container_name: frontend
+    restart: unless-stopped
+    networks:
+      - traefik
+    labels:
+      - "traefik.http.routers.frontend.service=frontend"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN_FRONTEND}`)"
+      - "traefik.http.routers.frontend.entrypoints=https"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  backend:
+    image: profileorg/wowtogo-be-dev:latest
+    container_name: backend
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+
+      - CLIENT_ORIGIN_URL=https://${DOMAIN_FRONTEND}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - POSTGRES_CONSTR=User ID=${BE_PG_USERNAME};Password=${BE_PG_PASSWORD};Host=backend_postgres;Port=5432;Database=${BE_PG_DATABASE};Pooling=true;Connection Lifetime=0;
+      - CLOUDINARY_URL=${CLOUDINARY_URL}
+      - FGA_API_URL=http://openfga:8080
+      - HOST=https://send.api.mailtrap.io/api/send
+      - PORT=25
+      - USERNAME=${MAIL_USERNAME}
+      - PASSWORD=${MAIL_PASSWORD}
+      - TOKEN=${MAIL_TOKEN}
+      - SENDER_NAME=${MAIL_SENDER_NAME}
+      - SENDER_EMAIL=${MAIL_SENDER_EMAIL}
+      - TEMPLATE_ID=${MAIL_TEMPLATE_ID}
+    depends_on:
+      - backend_database
+    networks:
+      - traefik
+    labels:
+      - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.services.backend.loadbalancer.server.port=80"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN_BACKEND}`)"
+      - "traefik.http.routers.backend.entrypoints=https"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  backend_database:
+    image: postgres:14-alpine
+    container_name: backend_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${BE_PG_USERNAME}
+      - POSTGRES_PASSWORD=${BE_PG_PASSWORD}
+      - POSTGRES_DB=${BE_PG_DATABASE}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - backend_db:/var/lib/postgresql/data
+    networks:
+      - traefik
+
+volumes:
+  backend_db:
+
+

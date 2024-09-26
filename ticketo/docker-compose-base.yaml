@@ -1,6 +1,8 @@
 version: '3'
+
 services:
 
+# ============ TRAEFIK ================== 
   reverse-proxy:
     image: traefik:v3.1
     container_name: traefik
@@ -33,81 +35,20 @@ services:
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_AUTH}"
       - "traefik.http.middlewares.traefik-auth.basicauth.removeheader=true"
       - "traefik.http.routers.reverse-proxy-rtr.middlewares=traefik-auth"
+      - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-logs:/logs
       - ./letsencrypt:/letsencrypt
     environment:
-      - CF_API_EMAIL=${CF_API_EMAIL}
-      - CF_API_KEY=${CF_API_KEY}
+      # - CF_API_EMAIL=${CF_API_EMAIL}
+      # - CF_API_KEY=${CF_API_KEY}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - CF_ZONE_API_TOKEN=${CF_ZONE_API_TOKEN}
     networks:
       - traefik
 
-  frontend:
-    image: profileorg/wowtogo-fe-dev:latest
-    container_name: frontend
-    restart: unless-stopped
-    expose:
-      - 80
-    networks:
-      - traefik
-    labels:
-      - "traefik.http.routers.frontend.service=frontend"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN_FRONTEND}`)"
-      - "traefik.http.routers.frontend.entrypoints=https"
-      - "traefik.http.routers.frontend.tls=true"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-
-  backend:
-    image: profileorg/wowtogo-be-dev:latest
-    container_name: backend
-    restart: unless-stopped
-    ports:
-      - 80
-    environment:
-      - ASPNETCORE_URLS=http://+
-      - CLIENT_ORIGIN_URL=https://${DOMAIN_FRONTEND}
-      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
-      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
-      - POSTGRES_CONSTR=User ID=${BE_PG_USERNAME};Password=${BE_PG_PASSWORD};Host=backend_postgres;Port=5432;Database=${BE_PG_DATABASE};Pooling=true;Connection Lifetime=0;
-      - CLOUDINARY_URL=${CLOUDINARY_URL}
-      - FGA_API_URL=http://openfga:8080
-      - HOST=https://send.api.mailtrap.io/api/send
-      - PORT=25
-      - USERNAME=${MAIL_USERNAME}
-      - PASSWORD=${MAIL_PASSWORD}
-      - TOKEN=${MAIL_TOKEN}
-      - SENDER_NAME=${MAIL_SENDER_NAME}
-      - SENDER_EMAIL=${MAIL_SENDER_EMAIL}
-      - TEMPLATE_ID=${MAIL_TEMPLATE_ID}
-    depends_on:
-      - backend_database
-    networks:
-      - traefik
-    labels:
-      - "traefik.http.routers.backend.service=backend"
-      - "traefik.http.services.backend.loadbalancer.server.port=80"
-      - "traefik.http.routers.backend.rule=Host(`${DOMAIN_BACKEND}`)"
-      - "traefik.http.routers.backend.entrypoints=https"
-      - "traefik.http.routers.backend.tls=true"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-
-  backend_database:
-    image: postgres:14-alpine
-    container_name: backend_postgres
-    restart: unless-stopped
-    ports:
-      - 5432
-    environment:
-      - POSTGRES_USER=${BE_PG_USERNAME}
-      - POSTGRES_PASSWORD=${BE_PG_PASSWORD}
-      - POSTGRES_DB=${BE_PG_DATABASE}
-    volumes:
-      - backend_db:/var/lib/postgresql/data
-    networks:
-      - traefik
-
+# ============ OPEN FGA ================== 
   open_fga_postgres:
     image: postgres:14-alpine
     container_name: fga_postgres
@@ -118,6 +59,8 @@ services:
       - POSTGRES_PASSWORD=${FGA_PG_PASSWORD}
     volumes:
       - openfga_db:/var/lib/postgresql/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${FGA_PG_USERNAME}" ]
       interval: 5s
@@ -135,6 +78,8 @@ services:
       - OPENFGA_DATASTORE_URI=postgres://${FGA_PG_USERNAME}:${FGA_PG_PASSWORD}@fga_postgres:5432/postgres?sslmode=disable
     networks:
       - traefik
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
   open_fga:
     container_name: openfga
@@ -149,13 +94,6 @@ services:
     command: run
     networks:
       - traefik
-    ports:
-      # Needed for the http server
-      - 8080
-      # Needed for the grpc server (if used)
-      - 8081
-      # Needed for the playground (Do not enable in prod!)
-      - 3000
     labels:
       - "traefik.http.routers.openfga.service=openfga"
       - "traefik.http.services.openfga.loadbalancer.server.port=3000"
@@ -166,12 +104,28 @@ services:
       - "traefik.http.routers.openfga.middlewares=traefik-auth"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_AUTH}"
       - "traefik.http.middlewares.traefik-auth.basicauth.removeheader=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       
+# ============ WATCH TOWER ================== 
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # - /root/.docker/config.json:/config.json
+    command: 
+      - --interval 30
+      - --label-enable
+      - --rolling-restart
+      - --cleanup
+    environment:
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL}
+      - WATCHTOWER_NOTIFICATION_TEMPLATE=${WATCHTOWER_NOTIFICATION_TEMPLATE}
+
+    
+
 volumes:
-  backend_db:
-  openfga_db:
   traefik-logs:
+  openfga_db:
 
 networks:
   traefik: {}
-  

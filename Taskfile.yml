@@ -1,37 +1,29 @@
 version: '3'
 
 tasks:
+
   up-*:
     vars:
       ENVIRONMENT: '{{index .MATCH 0}}'
-    dir: ./wowtogo
-    cmds:
-      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml pull
-      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d frontend backend backend_database open_fga_postgres open_fga_migrate open_fga
-      - sleep 10
-      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d reverse-proxy
+    dir: ./ticketo
+    cmd: docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d
 
   down-*:
     vars:
       ENVIRONMENT: '{{index .MATCH 0}}'
-    dir: ./wowtogo
+    dir: ./ticketo
     cmd: docker compose -f docker-compose-{{.ENVIRONMENT}}.yaml down
 
-  clear:
-    dir: ./wowtogo
+  clear-app:
+    dir: ./ticketo
+    cmds:
+      - docker volume rm wowtogo_backend_db
+
+  clear-all:
+    dir: ./ticketo
     cmds:
       - docker volume rm wowtogo_backend_db wowtogo_openfga_db wowtogo_traefik-logs
       - docker system prune -f
       - docker volume prune -f
       - rm -rf ./letsencrypt
     interactive: true
-
-
-  update-app-*:
-    vars:
-      ENVIRONMENT: '{{index .MATCH 0}}'
-    dir: ./wowtogo
-    cmds:
-      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml pull frontend backend
-      - docker compose -f docker-compose-{{.ENVIRONMENT}}.yaml down frontend backend
-      - docker compose --env-file .env -f docker-compose-{{.ENVIRONMENT}}.yaml up -d frontend backend
