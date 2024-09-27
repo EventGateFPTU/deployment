@@ -112,11 +112,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # - /root/.docker/config.json:/config.json
-    command: 
-      - --interval 30
-      - --label-enable
-      - --rolling-restart
-      - --cleanup
+    command: --interval 30 --label-enable --rolling-restart --cleanup
     environment:
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL}
       - WATCHTOWER_NOTIFICATION_TEMPLATE=${WATCHTOWER_NOTIFICATION_TEMPLATE}
