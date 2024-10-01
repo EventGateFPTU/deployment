@@ -27,3 +27,7 @@ tasks:
       - docker volume prune -f
       - rm -rf ./letsencrypt
     interactive: true
+
+  sync-compose:
+    cmds:
+      - git -C ./ticketo pull https://github.com/EventGateFPTU/deployment.git main
