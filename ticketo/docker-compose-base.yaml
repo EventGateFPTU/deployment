@@ -2,7 +2,7 @@ version: '3'
 
 services:
 
-# ============ TRAEFIK ================== 
+  # ============ TRAEFIK ================== 
   reverse-proxy:
     image: traefik:v3.1
     container_name: traefik
@@ -41,14 +41,12 @@ services:
       - traefik-logs:/logs
       - ./letsencrypt:/letsencrypt
     environment:
-      # - CF_API_EMAIL=${CF_API_EMAIL}
-      # - CF_API_KEY=${CF_API_KEY}
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
       - CF_ZONE_API_TOKEN=${CF_ZONE_API_TOKEN}
     networks:
       - traefik
 
-# ============ OPEN FGA ================== 
+  # ============ OPEN FGA ================== 
   open_fga_postgres:
     image: postgres:14-alpine
     container_name: fga_postgres
@@ -106,22 +104,38 @@ services:
       - "traefik.http.middlewares.traefik-auth.basicauth.removeheader=true"
       - "com.centurylinklabs.watchtower.enable=false"
       
-# ============ WATCH TOWER ================== 
+  # ============ PGADMIN ================== 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    networks:
+      - traefik
+    labels:
+      - "traefik.http.routers.pgadmin.rule=Host(`${DOMAIN_PGADMIN}`)"
+      - "traefik.http.routers.pgadmin.entrypoints=https"
+      - "traefik.http.routers.pgadmin.tls=true"
+      - "traefik.http.routers.pgadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.pgadmin.loadbalancer.server.port=80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+  # ============ WATCH TOWER ================== 
   watchtower:
     image: containrrr/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      # - /root/.docker/config.json:/config.json
     command: --interval 30 --label-enable --rolling-restart --cleanup
     environment:
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL}
       - WATCHTOWER_NOTIFICATION_TEMPLATE=${WATCHTOWER_NOTIFICATION_TEMPLATE}
 
-    
-
 volumes:
   traefik-logs:
   openfga_db:
+  pgadmin_data:
 
 networks:
   traefik: {}
