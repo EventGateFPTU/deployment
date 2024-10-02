@@ -37,6 +37,9 @@ services:
       - SENDER_NAME=${MAIL_SENDER_NAME}
       - SENDER_EMAIL=${MAIL_SENDER_EMAIL}
       - TEMPLATE_ID=${MAIL_TEMPLATE_ID}
+      - PAYOS_CLIENT_ID=${PAYOS_CLIENT_ID}
+      - PAYOS_API_KEY=${PAYOS_API_KEY}
+      - PAYOS_CHECKSUM_KEY=${PAYOS_CHECKSUM_KEY}
     depends_on:
       - backend_database
     networks:
