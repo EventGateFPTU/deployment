@@ -17,12 +17,12 @@ tasks:
   clear-app:
     dir: ./ticketo
     cmds:
-      - docker volume rm wowtogo_backend_db
+      - docker volume rm ticketo_backend_db
 
   clear-all:
     dir: ./ticketo
     cmds:
-      - docker volume rm wowtogo_backend_db wowtogo_openfga_db wowtogo_traefik-logs
+      - docker volume rm ticketo_backend_db ticketo_openfga_db ticketo_traefik-logs
       - docker system prune -f
       - docker volume prune -f
       - rm -rf ./letsencrypt
